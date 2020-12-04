@@ -118,7 +118,7 @@ class ProteinInformation:
             # Try to retrieve the corresponding external reference from the
             # annotation file by indexing the dataframe created using the
             # annotations file
-            anno_db_xref = anno_df.loc[gene_id]
+            anno_db_xref = anno_df.loc[gene_id][1]
 
         except KeyError:
             # If no external reference exists a key error will be thrown. Just
@@ -439,16 +439,21 @@ class Feature:
     A container for feature information.
     """
 
-    def __init__(self, feature_name, gff, line_start, line_end, **kwargs):
+    def __init__(self, feature_name, start_gene_count, gff, line_start, line_end, **kwargs):
         """
         Initializes a new feature.
         """
 
-        self.__feature_name = feature_name
-        self.__gff = gff
-        self.__line_start = line_start
-        self.__line_end = line_end
-        self.__kwargs = kwargs
+        self.__feature_name: str = feature_name
+        self.__start_gene_count: int = start_gene_count
+        self.__end_gene_count: int = start_gene_count
+        self.__gff: Gff3 = gff
+        self.__line_start: int = line_start
+        self.__line_end: int = line_end
+        self.__kwargs: dict = kwargs
+
+    def get__end_gene_count(self):
+        return self.__end_gene_count
 
     def segment_condition_met(self, current_line_num, next_line_num):
 
@@ -475,7 +480,6 @@ class Feature:
         """
 
         gene_lines_dict: Dict[Tuple[int, int], str] = {}
-
         current_line_num: int = self.__line_start
 
         # Keep moving to the next line until we find a gene
@@ -515,11 +519,14 @@ class Feature:
 
         gene_lines_dict: Dict[Tuple[int, int], str] = self.analyse()
 
-        for gene_num, (gene_start, gene_end) in enumerate(gene_lines_dict.keys(), start=1):
+        for gene_num, (gene_start, gene_end) in enumerate(gene_lines_dict.keys(),
+                                                          start=self.__start_gene_count):
 
             new_gene = GeneSequence(
                 self.__gff, gene_num, gene_start, gene_end, **self.__kwargs)
             comp_list.append(str(new_gene))
+
+        self.__end_gene_count = gene_num
 
         return '\n'.join(comp_list)
 
@@ -532,7 +539,7 @@ class FlatFileCreator:
     __gff_path = path.FileExtPath("gff")
 
     def __init__(self, locus_prefix: str, dname: str, gff_path: str,
-                 annotation_path: str, output_path: str = None):
+                 annotation_path: str, *, output_path: str = None):
         """
         Constructs a new Flat File Constructor.
 
@@ -561,7 +568,7 @@ class FlatFileCreator:
         # Set sep=None so that the Python parsing engine can automatically
         # detect the separator.
         self.__annotation_df = pd.read_csv(
-            self.__annotation_path, sep=None, header=None, index_col=0)
+            self.__annotation_path, engine='python', sep=None, header=None, index_col=0)
 
         # Start creating kwarg dict for protein information
         self.__kwarg = {
@@ -641,10 +648,14 @@ class FlatFileCreator:
         # Hold all the string representations of genes in a list
         feat_str_list: list = []
 
+        start_gene_count = 1
+
         for feat_name, (start, end) in zip(feat.values(), feat.keys()):
 
-            tmp_feat = Feature(feat_name, self.__gff,
+            tmp_feat = Feature(feat_name, start_gene_count, self.__gff,
                                start, end, **self.__kwarg)
             feat_str_list.append(str(tmp_feat))
+
+            start_gene_count = tmp_feat.get__end_gene_count() + 1
 
         return '\n'.join(feat_str_list)

@@ -8,6 +8,9 @@ from flatparse.sequencing import Feature
 
 gff_path = os.path.join(os.getcwd(), 'test',
                         'data', 'test_data', 'Breviolum_minutum_short_v2.gff')
+anno_path_v2 = os.path.join(os.getcwd(), 'test',
+                            'data', 'test_data', 'Bminutum_top_uniprot_hits_v2.tsv')
+
 output_path = os.path.join(os.getcwd(), 'test',
                            'data', 'tmp', 'test_flatfile_short.txt')
 
@@ -17,9 +20,10 @@ tmp_out_path = os.path.join(
 
 def ffc_cls():
 
-    ffc_test = FlatFileCreator("SYMB1", "teamcx", gff_path, output_path)
+    ffc_test = FlatFileCreator(
+        "SYMB1", "teamcx", gff_path, anno_path_v2, output_path=output_path)
 
-    pprint(ffc_test.analyse())
+    # pprint(ffc_test.analyse())
 
     ffc_test.create_flatfile()
 

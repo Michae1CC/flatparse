@@ -16,7 +16,7 @@ Example usage:
 def run_ffc(args):
 
     main_ffc = FlatFileCreator(
-        args.locus_prefix, args.dname, args.gff_path, args.output_path)
+        args.locus_prefix, args.dname, args.gff_path, args.anno_path, output_path=args.output_path)
     main_ffc.create_flatfile()
 
 
@@ -31,6 +31,9 @@ def main():
                         help='The teamname that processed the data.')
     parser.add_argument('--gff_path', type=str, required=True,
                         help='A file path to the gff file.')
+    parser.add_argument('--anno_path', type=str, required=True,
+                        help='A file path to the annotation file.')
+
     parser.add_argument('--output_path', type=str, required=False, default=None,
                         help='A file path to output the contents of the flatfile. '
                         'Default output file is stdout.')
