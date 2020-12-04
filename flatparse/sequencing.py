@@ -12,6 +12,80 @@ import flatparse.path as path
 from flatparse.gff3 import Gff3
 
 
+class ProteinInformation:
+    """
+    Holds information about the protein being sequenced.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initializes the protein information.
+
+        Parameters:
+
+            product:
+                The product annotation for the gene.
+
+            dname:
+                The team which identified the protein.
+
+            gene_locus:
+                The gene locus.
+
+            sequence_prefix:
+                Any prefix required when formatting the locus.
+        """
+
+        self.__product: str = kwargs["product"]
+        self.__dname: str = kwargs["dname"]
+        self.__gene_locus: str = kwargs["gene_locus"]
+        self.__sequence_prefix: str = kwargs["sequence_prefix"]
+
+    def __str__(self):
+        """
+        Returns the string representation for the protein information.
+        """
+
+        # Check to check that all the essential information is not None
+        essential_info = [self.__product, self.__dname,
+                          self.__gene_locus, self.__sequence_prefix]
+
+        if any(essential == None for essential in essential_info):
+            raise errors.InsufficientProteinInfo(protein=self)
+
+        compilation_list = []
+
+        product_str = "product {product}".format(product=self.__product)
+        compilation_list.append(product_str)
+
+        protein_id_str = "protein_id gnl|{dname}|{gene_locus}".format(
+            dname=self.__dname,
+            gene_locus=self.__gene_locus
+        )
+        compilation_list.append(protein_id_str)
+
+        transcript_id_str = "transcript_id gnl|{dname}|{sequence_prefix}.{gene_locus}".format(
+            dname=self.__dname,
+            sequence_prefix=self.__sequence_prefix,
+            gene_locus=self.__gene_locus
+        )
+
+        compilation_list.append(transcript_id_str)
+
+        return '\n'.join(compilation_list)
+
+    def __repr__(self):
+
+        repr_ = "product:{product}\ndname:{dname}\ngene_locus:{gene_locus}\nsequence_prefix:{sequence_prefix}".format(
+            product=self.__product,
+            dname=self.__dname,
+            gene_locus=self.__gene_locus,
+            sequence_prefix=self.__sequence_prefix,
+        )
+
+        return repr_
+
+
 class AbstractGene(abc.ABC):
     """
     Defines an abstract gene class within a sequence.
@@ -120,21 +194,6 @@ class AbstractGene(abc.ABC):
         return first_line + '\n' + '\t\t\t' + protein_info
 
 
-class CDSGene(AbstractGene):
-    """
-    Creates a container class for a CDS gene.
-    """
-
-    def __init__(self, gff: Gff3, gene_num: int, line_start: int, line_end: int, **kwargs):
-        """
-        Creates a new instace of an abstract gene.
-
-        Arguments the same as AbstractGene documentation
-        """
-
-        super().__init__("CDS", "mrna", gff, gene_num, line_start, line_end, **kwargs)
-
-
 class mRNAGene(AbstractGene):
     """
     Creates a container class for a mRNA gene.
@@ -150,78 +209,19 @@ class mRNAGene(AbstractGene):
         super().__init__("mRNA", "mrna", gff, gene_num, line_start, line_end, **kwargs)
 
 
-class ProteinInformation:
+class CDSGene(AbstractGene):
     """
-    Holds information about the protein being sequenced.
+    Creates a container class for a CDS gene.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, gff: Gff3, gene_num: int, line_start: int, line_end: int, **kwargs):
         """
-        Initializes the protein information.
+        Creates a new instace of an abstract gene.
 
-        Parameters:
-
-            product:
-                The product annotation for the gene.
-
-            dname:
-                The team which identified the protein.
-
-            gene_locus:
-                The gene locus.
-
-            sequence_prefix:
-                Any prefix required when formatting the locus.
+        Arguments the same as AbstractGene documentation
         """
 
-        self.__product: str = kwargs["product"]
-        self.__dname: str = kwargs["dname"]
-        self.__gene_locus: str = kwargs["gene_locus"]
-        self.__sequence_prefix: str = kwargs["sequence_prefix"]
-
-    def __str__(self):
-        """
-        Returns the string representation for the protein information.
-        """
-
-        # Check to check that all the essential information is not None
-        essential_info = [self.__product, self.__dname,
-                          self.__gene_locus, self.__sequence_prefix]
-
-        if any(essential == None for essential in essential_info):
-            raise errors.InsufficientProteinInfo(protein=self)
-
-        compilation_list = []
-
-        product_str = "product {product}".format(product=self.__product)
-        compilation_list.append(product_str)
-
-        protein_id_str = "protein_id gnl|{dname}|{gene_locus}".format(
-            dname=self.__dname,
-            gene_locus=self.__gene_locus
-        )
-        compilation_list.append(protein_id_str)
-
-        transcript_id_str = "transcript_id gnl|{dname}|{sequence_prefix}.{gene_locus}".format(
-            dname=self.__dname,
-            sequence_prefix=self.__sequence_prefix,
-            gene_locus=self.__gene_locus
-        )
-
-        compilation_list.append(transcript_id_str)
-
-        return '\n'.join(compilation_list)
-
-    def __repr__(self):
-
-        repr_ = "product:{product}\ndname:{dname}\ngene_locus:{gene_locus}\nsequence_prefix:{sequence_prefix}".format(
-            product=self.__product,
-            dname=self.__dname,
-            gene_locus=self.__gene_locus,
-            sequence_prefix=self.__sequence_prefix,
-        )
-
-        return repr_
+        super().__init__("CDS", "mrna", gff, gene_num, line_start, line_end, **kwargs)
 
 
 class GeneSequence:
@@ -230,7 +230,7 @@ class GeneSequence:
     """
 
     def __init__(self, gff: Gff3, gene_num: int,
-                 gene_locus_prefix: str, line_start: int, line_end: int, **kwargs):
+                 line_start: int, line_end: int, **kwargs):
         """
         Creates an instance of GeneSequence.
 
@@ -256,7 +256,6 @@ class GeneSequence:
 
         self.__gff: Gff3 = gff
         self.__gene_num: int = gene_num
-        self.__locus_prefix: str = gene_locus_prefix
         self.__line_start: int = line_start
         self.__line_end: int = line_end
         self.__kwargs = kwargs
@@ -360,7 +359,7 @@ class GeneSequence:
         )
 
         locus_line: str = "\t\t\tlocus_tag\t{locus_prefix}_{gene_num:04d}".format(
-            locus_prefix=self.__locus_prefix,
+            locus_prefix=self.__kwargs["locus_prefix"],
             gene_num=self.__gene_num
         )
 
@@ -451,14 +450,10 @@ class Feature:
 
         gene_lines_dict: Dict[Tuple[int, int], str] = self.analyse()
 
-        for gene_num, (locus_prefix, (gene_start, gene_end)) in enumerate(zip(gene_lines_dict.values(), gene_lines_dict.keys())):
-
-            # Make a shallow copy of the dictionary
-            protein_info_dict = {**self.__kwargs}
-            protein_info_dict["locus_prefix"] = locus_prefix
+        for gene_num, (gene_start, gene_end) in enumerate(gene_lines_dict.keys(), start=1):
 
             new_gene = GeneSequence(
-                self.__gff, gene_num, locus_prefix, gene_start, gene_end, **protein_info_dict)
+                self.__gff, gene_num, gene_start, gene_end, **self.__kwargs)
             comp_list.append(str(new_gene))
 
         return '\n'.join(comp_list)
@@ -547,7 +542,7 @@ class FlatFileCreator:
 
         current_feature, current_line_num = self.__gff.lines[0]['seqid'], 0
 
-        for next_line_num in range(len(self.__gff)):
+        for next_line_num in range(len(self.__gff.lines)):
 
             if self.segment_condition_met(current_line_num, next_line_num):
                 feat_lines_dict[(current_line_num,
@@ -556,8 +551,8 @@ class FlatFileCreator:
                 current_line_num = next_line_num
                 current_feature = self.__gff.lines[next_line_num]['seqid']
 
-        feat_lines_dict[(next_line_num,
-                         len(self.__gff) - 1)] = current_feature
+        feat_lines_dict[(current_line_num,
+                         len(self.__gff.lines) - 1)] = current_feature
 
         return feat_lines_dict
 
@@ -567,16 +562,15 @@ class FlatFileCreator:
         """
 
         # Gets the lines within the gff file which each gene belongs to
-        gene_lines_dict: Dict[str, Tuple[int, int]] = self.get_gene_dict()
+        feat: Dict[str, Tuple[int, int]] = self.analyse()
 
         # Hold all the string representations of genes in a list
-        gene_str_list: list = []
+        feat_str_list: list = []
 
-        for gene_num, (ID, (start, end)) in enumerate(zip(gene_lines_dict.keys(), gene_lines_dict.values()), start=1):
+        for feat_name, (start, end) in zip(feat.values(), feat.keys()):
 
-            tmp_gene_seq = GeneSequence(self.__locus_prefix, self.__dname,
-                                        self.__gff, gene_num, ID, start, end)
+            tmp_feat = Feature(feat_name, self.__gff,
+                               start, end, **self.__kwarg)
+            feat_str_list.append(str(tmp_feat))
 
-            gene_str_list.append(str(tmp_gene_seq))
-
-        return '\n'.join(gene_str_list)
+        return '\n'.join(feat_str_list)

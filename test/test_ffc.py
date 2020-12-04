@@ -11,8 +11,17 @@ gff_path = os.path.join(os.getcwd(), 'test',
 output_path = os.path.join(os.getcwd(), 'test',
                            'data', 'tmp', 'test_flatfile_short.txt')
 
-# ffc_test = FlatFileCreator("SYMB1", "teamcx", gff_path, output_path)
-# ffc_test.create_flatfile()
+tmp_out_path = os.path.join(
+    os.getcwd(), "test", "data", "tmp", "test_flat.txt")
+
+
+def ffc_cls():
+
+    ffc_test = FlatFileCreator("SYMB1", "teamcx", gff_path, output_path)
+
+    pprint(ffc_test.analyse())
+
+    ffc_test.create_flatfile()
 
 
 def feature_cls():
@@ -27,7 +36,7 @@ def feature_cls():
 
 
 def main():
-    feature_cls()
+    ffc_cls()
 
 
 if __name__ == '__main__':
