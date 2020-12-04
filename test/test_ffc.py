@@ -16,10 +16,14 @@ output_path = os.path.join(os.getcwd(), 'test',
 
 
 def feature_cls():
-    gff = Gff3(gff_file=gff_path)
-    test_feat = Feature("Bmin.scaffold2", gff, 0, 901)
 
-    pprint(test_feat.analyse())
+    kwargs = {"dname": "teamcx", "locus_prefix": "SYMB1"}
+
+    gff = Gff3(gff_file=gff_path)
+    test_feat = Feature("Bmin.scaffold2", gff, 0, 901, **kwargs)
+
+    # pprint(test_feat.analyse())
+    print(str(test_feat)[:200])
 
 
 def main():

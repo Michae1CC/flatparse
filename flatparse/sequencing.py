@@ -39,13 +39,13 @@ class AbstractGene(abc.ABC):
                 The ending line of the gene sequence.
         """
 
-        self.__kwargs = kwargs
         self.__type: str = type_
         self.__sequence_prefix: str = sequence_prefix
         self.__gff: Gff3 = gff
         self.__gene_num: int = gene_num
         self.__line_start: int = line_start
         self.__line_end: int = line_end
+        self.__kwargs = kwargs
 
     def get_type(self) -> str:
         """Returns the segment type as a string"""
@@ -89,12 +89,7 @@ class AbstractGene(abc.ABC):
         protein_info_dict["product"] = "PROTEIN_ANNOTATION"
 
         simple_protein_info = ProteinInformation(
-            product="PROTEIN_ANNOTATION",
-            teamname=self.__dname,
-            gene_locus="{locus_prefix}_{gene_num:04d}".format(
-                locus_prefix=self.__locus_prefix,
-                gene_num=self.__gene_num
-            ),
+            **protein_info_dict,
             sequence_prefix=self.__sequence_prefix
         )
 
@@ -130,16 +125,14 @@ class CDSGene(AbstractGene):
     Creates a container class for a CDS gene.
     """
 
-    def __init__(self, locus_prefix: str,
-                 dname: str, gff: Gff3, gene_num: int, line_start: int, line_end: int):
+    def __init__(self, gff: Gff3, gene_num: int, line_start: int, line_end: int, **kwargs):
         """
         Creates a new instace of an abstract gene.
 
         Arguments the same as AbstractGene documentation
         """
 
-        super().__init__("CDS", "mrna", locus_prefix,
-                         dname, gff, gene_num, line_start, line_end)
+        super().__init__("CDS", "mrna", gff, gene_num, line_start, line_end, **kwargs)
 
 
 class mRNAGene(AbstractGene):
@@ -147,16 +140,14 @@ class mRNAGene(AbstractGene):
     Creates a container class for a mRNA gene.
     """
 
-    def __init__(self, locus_prefix: str,
-                 dname: str, gff: Gff3, gene_num: int, line_start: int, line_end: int):
+    def __init__(self, gff: Gff3, gene_num: int, line_start: int, line_end: int, **kwargs):
         """
         Creates a new instace of an abstract gene.
 
         Arguments the same as AbstractGene documentation
         """
 
-        super().__init__("mRNA", "mrna", locus_prefix,
-                         dname, gff, gene_num, line_start, line_end)
+        super().__init__("mRNA", "mrna", gff, gene_num, line_start, line_end, **kwargs)
 
 
 class ProteinInformation:
@@ -239,7 +230,7 @@ class GeneSequence:
     """
 
     def __init__(self, gff: Gff3, gene_num: int,
-                 gene_ID: str, line_start: int, line_end: int, **kwargs):
+                 gene_locus_prefix: str, line_start: int, line_end: int, **kwargs):
         """
         Creates an instance of GeneSequence.
 
@@ -265,9 +256,10 @@ class GeneSequence:
 
         self.__gff: Gff3 = gff
         self.__gene_num: int = gene_num
-        self.__gene_ID: str = gene_ID
+        self.__locus_prefix: str = gene_locus_prefix
         self.__line_start: int = line_start
         self.__line_end: int = line_end
+        self.__kwargs = kwargs
 
     def analyse_sequence(self) -> Dict[Tuple[int, int], str]:
         """
@@ -353,19 +345,14 @@ class GeneSequence:
             gene_container: AbstractGene = None
 
             if type_ == "CDS":
-                gene_container = CDSGene(self.__locus_prefix, self.__dname,
-                                         self.__gff, self.__gene_num,
-                                         gene_con_start, gene_con_end)
+                gene_container = CDSGene(self.__gff, self.__gene_num,
+                                         gene_con_start, gene_con_end, **self.__kwargs)
             elif type_ == "mRNA":
-                gene_container = mRNAGene(self.__locus_prefix, self.__dname,
-                                          self.__gff, self.__gene_num,
-                                          gene_con_start, gene_con_end)
+                gene_container = mRNAGene(self.__gff, self.__gene_num,
+                                          gene_con_start, gene_con_end, **self.__kwargs)
 
             if gene_container is not None:
                 segment_str_list.append(str(gene_container))
-
-        feature_line: str = ">Features {gene_ID}".format(
-            gene_ID=self.__gene_ID)
 
         start_end_line: str = "{start}\t{end}\tgene".format(
             start=self.__gff.lines[self.__line_start]['start'],
@@ -379,7 +366,6 @@ class GeneSequence:
 
         segment_str_list.insert(0, locus_line)
         segment_str_list.insert(0, start_end_line)
-        segment_str_list.insert(0, feature_line)
 
         return '\n'.join(segment_str_list)
 
@@ -398,6 +384,7 @@ class Feature:
         self.__gff = gff
         self.__line_start = line_start
         self.__line_end = line_end
+        self.__kwargs = kwargs
 
     def segment_condition_met(self, current_line_num, next_line_num):
 
@@ -450,6 +437,32 @@ class Feature:
 
         return gene_lines_dict
 
+    def __str__(self):
+        """
+        Creates a string representation for the Feature.
+        """
+
+        # Create the feature header
+        feature_header: str = ">Features {feature_name}".format(
+            feature_name=self.__feature_name)
+
+        # Make a list of components that will eventually
+        comp_list = [feature_header]
+
+        gene_lines_dict: Dict[Tuple[int, int], str] = self.analyse()
+
+        for gene_num, (locus_prefix, (gene_start, gene_end)) in enumerate(zip(gene_lines_dict.values(), gene_lines_dict.keys())):
+
+            # Make a shallow copy of the dictionary
+            protein_info_dict = {**self.__kwargs}
+            protein_info_dict["locus_prefix"] = locus_prefix
+
+            new_gene = GeneSequence(
+                self.__gff, gene_num, locus_prefix, gene_start, gene_end, **protein_info_dict)
+            comp_list.append(str(new_gene))
+
+        return '\n'.join(comp_list)
+
 
 class FlatFileCreator:
     """
@@ -476,13 +489,17 @@ class FlatFileCreator:
                 A file path to output the contents of the flatfile.
         """
 
-        self.__locus_prefix: str = locus_prefix
-        self.__dname: str = dname
         self.__gff_path: str = gff_path
         self.__output_path: str = output_path
 
         # Open the gff file and read it into a dict
         self.__gff: Gff3 = Gff3(gff_file=self.__gff_path)
+
+        # Start creating kwarg dict for protein information
+        self.__kwarg = {
+            "dname": dname,
+            "locus_prefix": locus_prefix
+        }
 
     def create_flatfile(self):
         """
@@ -498,43 +515,51 @@ class FlatFileCreator:
 
         return
 
-    def get_gene_dict(self) -> Dict[str, Tuple[int, int]]:
+    def segment_condition_met(self, current_line_num, next_line_num):
+
+        current_feature_name = self.__gff.lines[current_line_num]['seqid']
+        next_feature_name = self.__gff.lines[next_line_num]['seqid']
+
+        if current_feature_name != next_feature_name:
+            return True
+
+        return False
+
+    def analyse(self) -> Dict[Tuple[int, int], str]:
         """
-        Creates a dictionary which contains the lines (zero indexed) within the gff file 
-        which each gene corresponds to.
+        Creates a dictionary which contains the start and end lines of each new
+        feature.
 
         Example:
             {
-                "Bmin.gene1": (0,55),
-                "Bmin.gene2": (56,165)
+                (0, 901): "Bmin.scaffold2",
+                (902, 1259): "Bmin.scaffold2",
+                (1260, 1951): "Bmin.scaffold3",
             }
-        This example tells us that gene "Bmin.gene1" extends from line 0 to 
-        line 55 (zero indexed) within the gff file.
+        This example tells us that gene "Bmin.scaffold2" extends from line 0 to 
+        line 901 (zero indexed) within the gff file.
 
         Return:
             The aforementioned dictionary.
         """
 
-        gene_lines_dict: Dict[str, Tuple[int, int]] = {}
+        feat_lines_dict: Dict[str, Tuple[int, int]] = {}
 
-        current_gene, current_line = None, None
-        next_gene, next_line = None, None
+        current_feature, current_line_num = self.__gff.lines[0]['seqid'], 0
 
-        for line_no, line_ in enumerate(self.__gff.lines):
+        for next_line_num in range(len(self.__gff)):
 
-            if line_["type"] == "gene":
-                current_gene, current_line = next_gene, next_line
-                next_gene, next_line = line_["attributes"]["ID"], line_no
+            if self.segment_condition_met(current_line_num, next_line_num):
+                feat_lines_dict[(current_line_num,
+                                 next_line_num - 1)] = current_feature
 
-                if current_gene is not None and current_line is not None:
-                    gene_lines_dict[current_gene] = (
-                        current_line, next_line - 1)
+                current_line_num = next_line_num
+                current_feature = self.__gff.lines[next_line_num]['seqid']
 
-        # Don't forget the final gene!
-        gene_lines_dict[next_gene] = (
-            next_line, len(self.__gff.lines) - 1)
+        feat_lines_dict[(next_line_num,
+                         len(self.__gff) - 1)] = current_feature
 
-        return gene_lines_dict
+        return feat_lines_dict
 
     def __str__(self):
         """
