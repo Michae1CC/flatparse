@@ -409,7 +409,7 @@ class TestFeature(unittest.TestCase):
 
         cls = self.__class__
 
-        sequencing.Feature(
+        sequencing.GeneSequence(
             "SYMB1", "teamcx", cls.short_gff, 1, "Bmin.gene1", 0, 56
         )
 
@@ -417,7 +417,7 @@ class TestFeature(unittest.TestCase):
 
         cls = self.__class__
 
-        test_gene_seq = sequencing.Feature(
+        test_gene_seq = sequencing.GeneSequence(
             "SYMB1", "teamcx", cls.short_gff, 1, "Bmin.gene1", 0, 55
         )
 
@@ -429,7 +429,7 @@ class TestFeature(unittest.TestCase):
         self.assertEqual(test_gene_seq.analyse_sequence(), expected_sequence)
 
         # Test the second gene
-        test_gene_seq = sequencing.Feature(
+        test_gene_seq = sequencing.GeneSequence(
             "SYMB1", "teamcx", cls.short_gff, 2, "Bmin.gene1", 56, 165
         )
 
@@ -444,7 +444,7 @@ class TestFeature(unittest.TestCase):
 
         cls = self.__class__
 
-        test_gene_seq = sequencing.Feature(
+        test_gene_seq = sequencing.GeneSequence(
             "SYMB1", "teamcx", cls.gff_1, 1, "Bmin.gene1", 0, 55
         )
 
@@ -459,7 +459,7 @@ class TestFeature(unittest.TestCase):
 
         cls = self.__class__
 
-        test_gene_seq = sequencing.Feature(
+        test_gene_seq = sequencing.GeneSequence(
             "SYMB1", "teamcx", cls.short_gff, 1, "Bmin.gene1", 0, 56
         )
 
@@ -483,7 +483,7 @@ class TestFeature(unittest.TestCase):
         self.assertEqual(str(test_gene_seq), expected)
 
         # Test the second gene
-        test_gene_seq = sequencing.Feature(
+        test_gene_seq = sequencing.GeneSequence(
             "SYMB1", "teamcx", cls.short_gff, 2, "Bmin.gene2", 56, 165
         )
 
@@ -510,7 +510,7 @@ class TestFeature(unittest.TestCase):
 
         cls = self.__class__
 
-        test_gene_seq = sequencing.Feature(
+        test_gene_seq = sequencing.GeneSequence(
             "SYMB1", "teamcx", cls.gff_1, 1, "Bmin.gene1", 0, 55
         )
 
@@ -628,11 +628,11 @@ class TestFlatFileCreator(unittest.TestCase):
 
         cls = self.__class__
 
-        gene_seq_1 = sequencing.Feature(
+        gene_seq_1 = sequencing.GeneSequence(
             "SYMB1", "teamcx", cls.short_gff, 1, "Bmin.gene1", 0, 55
         )
 
-        gene_seq_2 = sequencing.Feature(
+        gene_seq_2 = sequencing.GeneSequence(
             "SYMB1", "teamcx", cls.short_gff, 2, "Bmin.gene2", 56, 165
         )
 
@@ -647,7 +647,7 @@ class TestFlatFileCreator(unittest.TestCase):
 
         cls = self.__class__
 
-        gene_seq_1 = sequencing.Feature(
+        gene_seq_1 = sequencing.GeneSequence(
             "SYMB1", "teamcx", cls.gff_1, 1, "Bmin.gene1", 0, 55
         )
 

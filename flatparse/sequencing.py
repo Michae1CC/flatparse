@@ -4,6 +4,7 @@ __author__ = 'Michael Ciccotosto-Camp'
 __version__ = ''
 
 import abc
+from copy import copy
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 import flatparse.errors as errors
@@ -16,8 +17,8 @@ class AbstractGene(abc.ABC):
     Defines an abstract gene class within a sequence.
     """
 
-    def __init__(self, type_: str, sequence_prefix: str, locus_prefix: str,
-                 dname: str, gff: Gff3, gene_num: int, line_start: int, line_end: int):
+    def __init__(self, type_: str, sequence_prefix: str, gff: Gff3,
+                 gene_num: int, line_start: int, line_end: int, **kwargs):
         """
         Creates a new instance of an abstract gene.
 
@@ -38,10 +39,9 @@ class AbstractGene(abc.ABC):
                 The ending line of the gene sequence.
         """
 
+        self.__kwargs = kwargs
         self.__type: str = type_
         self.__sequence_prefix: str = sequence_prefix
-        self.__locus_prefix: str = locus_prefix
-        self.__dname: str = dname
         self.__gff: Gff3 = gff
         self.__gene_num: int = gene_num
         self.__line_start: int = line_start
@@ -77,6 +77,16 @@ class AbstractGene(abc.ABC):
         """
         Builds the string representation for the protine infomation.
         """
+
+        # Make a shallow copy of the dictionary
+        protein_info_dict = {**self.__kwargs}
+        protein_info_dict["product"] = "PROTEIN_ANNOTATION"
+        protein_info_dict["gene_num"] = self.__gene_num
+        protein_info_dict["gene_locus"] = "{locus_prefix}_{gene_num:04d}".format(
+            locus_prefix=protein_info_dict["locus_prefix"],
+            gene_num=self.__gene_num
+        )
+        protein_info_dict["product"] = "PROTEIN_ANNOTATION"
 
         simple_protein_info = ProteinInformation(
             product="PROTEIN_ANNOTATION",
@@ -154,7 +164,7 @@ class ProteinInformation:
     Holds information about the protein being sequenced.
     """
 
-    def __init__(self, product: str = None, teamname: str = None, gene_locus: str = None, sequence_prefix: str = None):
+    def __init__(self, **kwargs):
         """
         Initializes the protein information.
 
@@ -163,7 +173,7 @@ class ProteinInformation:
             product:
                 The product annotation for the gene.
 
-            teamname:
+            dname:
                 The team which identified the protein.
 
             gene_locus:
@@ -173,10 +183,10 @@ class ProteinInformation:
                 Any prefix required when formatting the locus.
         """
 
-        self.__product: str = product
-        self.__teamname: str = teamname
-        self.__gene_locus: str = gene_locus
-        self.__sequence_prefix: str = sequence_prefix
+        self.__product: str = kwargs["product"]
+        self.__dname: str = kwargs["dname"]
+        self.__gene_locus: str = kwargs["gene_locus"]
+        self.__sequence_prefix: str = kwargs["sequence_prefix"]
 
     def __str__(self):
         """
@@ -184,7 +194,7 @@ class ProteinInformation:
         """
 
         # Check to check that all the essential information is not None
-        essential_info = [self.__product, self.__teamname,
+        essential_info = [self.__product, self.__dname,
                           self.__gene_locus, self.__sequence_prefix]
 
         if any(essential == None for essential in essential_info):
@@ -195,14 +205,14 @@ class ProteinInformation:
         product_str = "product {product}".format(product=self.__product)
         compilation_list.append(product_str)
 
-        protein_id_str = "protein_id gnl|{teamname}|{gene_locus}".format(
-            teamname=self.__teamname,
+        protein_id_str = "protein_id gnl|{dname}|{gene_locus}".format(
+            dname=self.__dname,
             gene_locus=self.__gene_locus
         )
         compilation_list.append(protein_id_str)
 
-        transcript_id_str = "transcript_id gnl|{teamname}|{sequence_prefix}.{gene_locus}".format(
-            teamname=self.__teamname,
+        transcript_id_str = "transcript_id gnl|{dname}|{sequence_prefix}.{gene_locus}".format(
+            dname=self.__dname,
             sequence_prefix=self.__sequence_prefix,
             gene_locus=self.__gene_locus
         )
@@ -213,9 +223,9 @@ class ProteinInformation:
 
     def __repr__(self):
 
-        repr_ = "product:{product}\nteamname:{teamname}\ngene_locus:{gene_locus}\nsequence_prefix:{sequence_prefix}".format(
+        repr_ = "product:{product}\ndname:{dname}\ngene_locus:{gene_locus}\nsequence_prefix:{sequence_prefix}".format(
             product=self.__product,
-            teamname=self.__teamname,
+            dname=self.__dname,
             gene_locus=self.__gene_locus,
             sequence_prefix=self.__sequence_prefix,
         )
@@ -223,23 +233,17 @@ class ProteinInformation:
         return repr_
 
 
-class Feature:
+class GeneSequence:
     """
     Holds information about a single feature.
     """
 
-    def __init__(self, locus_prefix: str, dname: str, gff: Gff3, gene_num: int,
-                 gene_ID: str, line_start: int, line_end: int):
+    def __init__(self, gff: Gff3, gene_num: int,
+                 gene_ID: str, line_start: int, line_end: int, **kwargs):
         """
-        Creates an instance of Feature.
+        Creates an instance of GeneSequence.
 
         Parameters:
-            locus_prefix:
-                The prefix of each locus.
-
-            teamname:
-                The teamname that processed the data.
-
             gff:
                 An instance of the Gff3 parser for the gff file of interest.
 
@@ -259,8 +263,6 @@ class Feature:
                 The ending line of the gene sequence.
         """
 
-        self.__locus_prefix: str = locus_prefix
-        self.__dname: str = dname
         self.__gff: Gff3 = gff
         self.__gene_num: int = gene_num
         self.__gene_ID: str = gene_ID
@@ -382,6 +384,73 @@ class Feature:
         return '\n'.join(segment_str_list)
 
 
+class Feature:
+    """
+    A container for feature information.
+    """
+
+    def __init__(self, feature_name, gff, line_start, line_end, **kwargs):
+        """
+        Initializes a new feature.
+        """
+
+        self.__feature_name = feature_name
+        self.__gff = gff
+        self.__line_start = line_start
+        self.__line_end = line_end
+
+    def segment_condition_met(self, current_line_num, next_line_num):
+
+        if self.__gff.lines[next_line_num]['type'] == "gene":
+            return True
+
+        return False
+
+    def analyse(self) -> Dict[str, Tuple[int, int]]:
+        """
+        Creates a dictionary which contains the lines (zero indexed) within the gff file 
+        which each gene corresponds to.
+
+        Example:
+            {
+                "Bmin.gene1": (0,55),
+                "Bmin.gene2": (56,165)
+            }
+        This example tells us that gene "Bmin.gene1" extends from line 0 to 
+        line 55 (zero indexed) within the gff file.
+
+        Return:
+            The aforementioned dictionary.
+        """
+
+        gene_lines_dict: Dict[Tuple[int, int], str] = {}
+
+        current_line_num: int = self.__line_start
+
+        # Keep moving to the next line until we find a gene
+
+        while self.__gff.lines[current_line_num]["type"] != "gene":
+            current_line_num += 1
+
+        current_gene = self.__gff.lines[current_line_num]["attributes"]["ID"]
+
+        # Start decomposing the sequence
+        for next_line_num in range(current_line_num + 1, self.__line_end):
+
+            # Check to see if we have reached a new segment
+            if self.segment_condition_met(current_line_num, next_line_num):
+                gene_lines_dict[(current_line_num, next_line_num - 1)
+                                ] = current_gene
+
+                current_line_num = next_line_num
+                current_gene = self.__gff.lines[next_line_num]["attributes"]["ID"]
+
+        # Don't forget to save the last segment!
+        gene_lines_dict[(current_line_num, self.__line_end)] = current_gene
+
+        return gene_lines_dict
+
+
 class FlatFileCreator:
     """
     A class that manages the overall creation of the final flat file.
@@ -480,8 +549,8 @@ class FlatFileCreator:
 
         for gene_num, (ID, (start, end)) in enumerate(zip(gene_lines_dict.keys(), gene_lines_dict.values()), start=1):
 
-            tmp_gene_seq = Feature(self.__locus_prefix, self.__dname,
-                                   self.__gff, gene_num, ID, start, end)
+            tmp_gene_seq = GeneSequence(self.__locus_prefix, self.__dname,
+                                        self.__gff, gene_num, ID, start, end)
 
             gene_str_list.append(str(tmp_gene_seq))
 
