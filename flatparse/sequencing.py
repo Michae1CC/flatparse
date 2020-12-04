@@ -4,7 +4,7 @@ __author__ = 'Michael Ciccotosto-Camp'
 __version__ = ''
 
 import abc
-from copy import copy
+import pandas as pd
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 import flatparse.errors as errors
@@ -35,6 +35,8 @@ class ProteinInformation:
             sequence_prefix:
                 Any prefix required when formatting the locus.
         """
+
+        self.__kwargs = kwargs
 
         self.__product: str = kwargs["product"]
         self.__dname: str = kwargs["dname"]
@@ -72,6 +74,12 @@ class ProteinInformation:
 
         compilation_list.append(transcript_id_str)
 
+        # Try and get the external reference
+        db_xref_str = self.get_external_reference()
+
+        if db_xref_str is not None:
+            compilation_list.append(db_xref_str)
+
         return '\n'.join(compilation_list)
 
     def __repr__(self):
@@ -84,6 +92,48 @@ class ProteinInformation:
         )
 
         return repr_
+
+    def get_external_reference(self) -> str:
+        """
+        Attempts to find an external database reference from the annotations 
+        file.
+
+        Return:
+            The appropriately formatted reference string IF a reference is 
+            found, None otherwise.
+
+        Example:
+            gene_id="UniProtKB/Swiss-Prot:P12345"
+        """
+
+        # Create a quick reference to the annotations dataframe
+        anno_df = self.__kwargs["annotation_df"]
+
+        # Retrieve the gene id
+        gene_id = self.__kwargs["gene_id"]
+
+        anno_db_xref = None
+
+        try:
+            # Try to retrieve the corresponding external reference from the
+            # annotation file by indexing the dataframe created using the
+            # annotations file
+            anno_db_xref = anno_df.loc[gene_id]
+
+        except KeyError:
+            # If no external reference exists a key error will be thrown. Just
+            # return None if this is the case
+            return None
+
+        db_xref_prefix, db_xref_id, *_ = anno_db_xref.split(sep='|')
+
+        if db_xref_prefix == "sp":
+            return "db_xref=UniProtKB/Swiss-Prot:{0}".format(db_xref_id)
+        elif db_xref_prefix == "tr":
+            return "db_xref=UniProtKB/TrEMBL:{0}".format(db_xref_id)
+
+        raise NotImplementedError(
+            "Not equipped to handle db xref prefix: " + db_xref_prefix)
 
 
 class AbstractGene(abc.ABC):
@@ -115,11 +165,16 @@ class AbstractGene(abc.ABC):
 
         self.__type: str = type_
         self.__sequence_prefix: str = sequence_prefix
-        self.__gff: Gff3 = gff
+        self.gff: Gff3 = gff
         self.__gene_num: int = gene_num
         self.__line_start: int = line_start
         self.__line_end: int = line_end
         self.__kwargs = kwargs
+
+    @property
+    def gene_id(self):
+        """Retrieves the database external reference."""
+        raise NotImplementedError
 
     def get_type(self) -> str:
         """Returns the segment type as a string"""
@@ -138,12 +193,12 @@ class AbstractGene(abc.ABC):
 
         for line_num in range(self.__line_start, self.__line_end + 1):
 
-            if self.__gff.lines[line_num]['type'] == "exon":
+            if self.gff.lines[line_num]['type'] == "exon":
                 continue
 
-            elif self.__gff.lines[line_num]['type'] == self.__type:
+            elif self.gff.lines[line_num]['type'] == self.__type:
                 lpb_list.append(
-                    (self.__gff.lines[line_num]['start'], self.__gff.lines[line_num]['end']))
+                    (self.gff.lines[line_num]['start'], self.gff.lines[line_num]['end']))
 
         return lpb_list
 
@@ -154,13 +209,15 @@ class AbstractGene(abc.ABC):
 
         # Make a shallow copy of the dictionary
         protein_info_dict = {**self.__kwargs}
+
         protein_info_dict["product"] = "PROTEIN_ANNOTATION"
         protein_info_dict["gene_num"] = self.__gene_num
         protein_info_dict["gene_locus"] = "{locus_prefix}_{gene_num:04d}".format(
             locus_prefix=protein_info_dict["locus_prefix"],
             gene_num=self.__gene_num
         )
-        protein_info_dict["product"] = "PROTEIN_ANNOTATION"
+        protein_info_dict["parent"] = self.gff.lines[self.__line_start]
+        protein_info_dict["gene_id"] = self.gene_id
 
         simple_protein_info = ProteinInformation(
             **protein_info_dict,
@@ -208,6 +265,10 @@ class mRNAGene(AbstractGene):
 
         super().__init__("mRNA", "mrna", gff, gene_num, line_start, line_end, **kwargs)
 
+    @property
+    def gene_id(self):
+        return self.gff.lines[self._AbstractGene__line_start]["attributes"]["Name"]
+
 
 class CDSGene(AbstractGene):
     """
@@ -222,6 +283,10 @@ class CDSGene(AbstractGene):
         """
 
         super().__init__("CDS", "mrna", gff, gene_num, line_start, line_end, **kwargs)
+
+    @property
+    def gene_id(self):
+        return self.gff.lines[self._AbstractGene__line_start]["attributes"]["Parent"][0]
 
 
 class GeneSequence:
@@ -466,7 +531,8 @@ class FlatFileCreator:
 
     __gff_path = path.FileExtPath("gff")
 
-    def __init__(self, locus_prefix: str, dname: str, gff_path: str, output_path: str = None):
+    def __init__(self, locus_prefix: str, dname: str, gff_path: str,
+                 annotation_path: str, output_path: str = None):
         """
         Constructs a new Flat File Constructor.
 
@@ -485,15 +551,23 @@ class FlatFileCreator:
         """
 
         self.__gff_path: str = gff_path
+        self.__annotation_path: str = annotation_path
         self.__output_path: str = output_path
 
         # Open the gff file and read it into a dict
         self.__gff: Gff3 = Gff3(gff_file=self.__gff_path)
 
+        # Open the annotations path as a pandas dataframe.
+        # Set sep=None so that the Python parsing engine can automatically
+        # detect the separator.
+        self.__annotation_df = pd.read_csv(
+            self.__annotation_path, sep=None, header=None, index_col=0)
+
         # Start creating kwarg dict for protein information
         self.__kwarg = {
             "dname": dname,
-            "locus_prefix": locus_prefix
+            "locus_prefix": locus_prefix,
+            "annotation_df": self.__annotation_df
         }
 
     def create_flatfile(self):

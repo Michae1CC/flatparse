@@ -9,8 +9,9 @@ gff_path = gff_path = os.path.join(os.getcwd(), 'test',
 gff = Gff3(gff_file=gff_path)
 
 pprint(len(gff.lines))
-pprint(gff.lines[0].keys())
-pprint(gff.lines[0]['seqid'])
+pprint(gff.lines[2].keys())
+pprint(gff.lines[1]['attributes']["Name"])
+pprint(gff.lines[2]['attributes']['Parent'][0])
 # pprint(gff.lines[1]['attributes'])
 # pprint(gff.lines[1]['line_index'])
 # pprint(gff.lines[1]['line_raw'])

@@ -13,4 +13,4 @@ anno_df = pd.read_csv(anno_filepath, sep=None, header=None, index_col=0)
 
 print(anno_df.head())
 # Get all the annotation values belonging to the gene Bmin.gene1.mRNA1
-print(anno_df.loc["Bmin.gene1.mRNA1"])
+print(anno_df.loc["Bmin.gene1.mRNA2"])
