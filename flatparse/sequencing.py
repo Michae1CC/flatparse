@@ -562,9 +562,16 @@ class FlatFileCreator:
                 The delimiter for the annotation file. The default is a tab.
         """
 
+        if anno_delim == 'None':
+            anno_delim = None
+
+        else:
+            for old, new in [('\\n', '\n'), ('\\t', '\t'), ('\\r', '\r')]:
+                anno_delim = anno_delim.replace(old, new)
+
         self.__gff_path: str = gff_path
         self.__anno_delim: str = anno_delim
-        self.__annotation_path: str = self.open_anno_file()
+        self.__annotation_path: str = annotation_path
         self.__output_path: str = output_path
 
         # Open the gff file and read it into a dict
@@ -573,8 +580,7 @@ class FlatFileCreator:
         # Open the annotations path as a pandas dataframe.
         # Set sep=None so that the Python parsing engine can automatically
         # detect the separator.
-        self.__annotation_df = pd.read_csv(
-            self.__annotation_path, engine='python', sep=None, header=None, index_col=0)
+        self.__annotation_df = self.open_anno_file()
 
         # Start creating kwarg dict for protein information
         self.__kwarg = {
