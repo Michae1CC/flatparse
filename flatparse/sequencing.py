@@ -4,6 +4,7 @@ __author__ = 'Michael Ciccotosto-Camp'
 __version__ = ''
 
 import abc
+import warnings
 import pandas as pd
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
 
@@ -103,7 +104,7 @@ class ProteinInformation:
             found, None otherwise.
 
         Example:
-            gene_id="UniProtKB/Swiss-Prot:P12345"
+            db_xref="UniProtKB/Swiss-Prot:P12345"
         """
 
         # Create a quick reference to the annotations dataframe
@@ -128,9 +129,9 @@ class ProteinInformation:
         db_xref_prefix, db_xref_id, *_ = anno_db_xref.split(sep='|')
 
         if db_xref_prefix == "sp":
-            return "db_xref=UniProtKB/Swiss-Prot:{0}".format(db_xref_id)
+            return 'db_xref="UniProtKB/Swiss-Prot:{0}"'.format(db_xref_id)
         elif db_xref_prefix == "tr":
-            return "db_xref=UniProtKB/TrEMBL:{0}".format(db_xref_id)
+            return 'db_xref="UniProtKB/TrEMBL:{0}"'.format(db_xref_id)
 
         raise NotImplementedError(
             "Not equipped to handle db xref prefix: " + db_xref_prefix)
@@ -165,15 +166,15 @@ class AbstractGene(abc.ABC):
 
         self.__type: str = type_
         self.__sequence_prefix: str = sequence_prefix
-        self.gff: Gff3 = gff
+        self._gff: Gff3 = gff
         self.__gene_num: int = gene_num
         self.__line_start: int = line_start
         self.__line_end: int = line_end
         self.__kwargs = kwargs
 
     @property
-    def gene_id(self):
-        """Retrieves the database external reference."""
+    def gene_id(self) -> str:
+        """Retrieves the gene id."""
         raise NotImplementedError
 
     def get_type(self) -> str:
@@ -193,18 +194,18 @@ class AbstractGene(abc.ABC):
 
         for line_num in range(self.__line_start, self.__line_end + 1):
 
-            if self.gff.lines[line_num]['type'] == "exon":
+            if self._gff.lines[line_num]['type'] == "exon":
                 continue
 
-            elif self.gff.lines[line_num]['type'] == self.__type:
+            elif self._gff.lines[line_num]['type'] == self.__type:
                 lpb_list.append(
-                    (self.gff.lines[line_num]['start'], self.gff.lines[line_num]['end']))
+                    (self._gff.lines[line_num]['start'], self._gff.lines[line_num]['end']))
 
         return lpb_list
 
     def get_protein_info(self) -> str:
         """
-        Builds the string representation for the protine infomation.
+        Builds the string representation for the protein infomation.
         """
 
         # Make a shallow copy of the dictionary
@@ -216,7 +217,7 @@ class AbstractGene(abc.ABC):
             locus_prefix=protein_info_dict["locus_prefix"],
             gene_num=self.__gene_num
         )
-        protein_info_dict["parent"] = self.gff.lines[self.__line_start]
+        protein_info_dict["parent"] = self._gff.lines[self.__line_start]
         protein_info_dict["gene_id"] = self.gene_id
 
         simple_protein_info = ProteinInformation(
@@ -267,7 +268,7 @@ class mRNAGene(AbstractGene):
 
     @property
     def gene_id(self):
-        return self.gff.lines[self._AbstractGene__line_start]["attributes"]["Name"]
+        return self._gff.lines[self._AbstractGene__line_start]["attributes"]["Name"]
 
 
 class CDSGene(AbstractGene):
@@ -286,7 +287,7 @@ class CDSGene(AbstractGene):
 
     @property
     def gene_id(self):
-        return self.gff.lines[self._AbstractGene__line_start]["attributes"]["Parent"][0]
+        return self._gff.lines[self._AbstractGene__line_start]["attributes"]["Parent"][0]
 
 
 class GeneSequence:
@@ -452,7 +453,7 @@ class Feature:
         self.__line_end: int = line_end
         self.__kwargs: dict = kwargs
 
-    def get__end_gene_count(self):
+    def get__end_gene_count(self) -> int:
         return self.__end_gene_count
 
     def segment_condition_met(self, current_line_num, next_line_num):
@@ -537,9 +538,10 @@ class FlatFileCreator:
     """
 
     __gff_path = path.FileExtPath("gff")
+    __annotation_path = path.FilePath()
 
     def __init__(self, locus_prefix: str, dname: str, gff_path: str,
-                 annotation_path: str, *, output_path: str = None):
+                 annotation_path: str, *, output_path: str = None, anno_delim: str = '\t'):
         """
         Constructs a new Flat File Constructor.
 
@@ -555,10 +557,14 @@ class FlatFileCreator:
 
             output_path:
                 A file path to output the contents of the flatfile.
+
+            anno_delim:
+                The delimiter for the annotation file. The default is a tab.
         """
 
         self.__gff_path: str = gff_path
-        self.__annotation_path: str = annotation_path
+        self.__anno_delim: str = anno_delim
+        self.__annotation_path: str = self.open_anno_file()
         self.__output_path: str = output_path
 
         # Open the gff file and read it into a dict
@@ -590,6 +596,39 @@ class FlatFileCreator:
             print(str(self), file=file_out, flush=True)
 
         return
+
+    def open_anno_file(self):
+        """
+        Opens the annotations file.
+        """
+
+        # Try opening the annotations file using the given delimiter using the
+        # given delimiter using the c-engine. We will only use the python engine
+        # if specified the delimiter is None.
+
+        if self.__anno_delim is None:
+            return pd.read_csv(
+                self.__annotation_path, engine='python', sep=None, header=None, index_col=0)
+
+        anno_df = pd.read_csv(
+            self.__annotation_path, engine='c', sep=self.__anno_delim, header=None, index_col=0)
+
+        _, df_cols = anno_df.shape
+
+        if df_cols != 1:
+            return anno_df
+
+        # If we only have one column then the delimiter we are using probably is
+        # not correct. We should have at least two columns.
+
+        warning_message = 'Only one column detected in annotation dataframe'
+        'with --delimiter=={0!r}. Expected at least two columns. Switching to python engine parser.'
+        warning_message = warning_message.format(self.__anno_delim)
+
+        warnings.warn(warning_message, RuntimeWarning)
+
+        return pd.read_csv(
+            self.__annotation_path, engine='python', sep=None, header=None, index_col=0)
 
     def segment_condition_met(self, current_line_num, next_line_num):
 

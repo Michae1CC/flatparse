@@ -1,5 +1,7 @@
 import os
 
+import argparse
+import warnings
 from pprint import pprint
 
 from flatparse.gff3 import Gff3
@@ -39,8 +41,28 @@ def feature_cls():
     print(str(test_feat)[:200])
 
 
+def test_delim():
+
+    parser = argparse.ArgumentParser(description="Creates a flat file from a "
+                                     "given gff file and annotations file.")
+
+    parser.add_argument('--delimiter', type=str,
+                        required=False, default='\t')
+    args = parser.parse_args()
+
+    delimiter = args.delimiter
+
+    for old, new in [('\\n', '\n'), ('\\t', '\t'), ('\\r', '\r')]:
+        delimiter = delimiter.replace(old, new)
+
+    warnings.warn('This is a warning only {0!r}'.format(
+        delimiter), RuntimeWarning)
+
+    print('Hello ' + delimiter + ' world')
+
+
 def main():
-    ffc_cls()
+    test_delim()
 
 
 if __name__ == '__main__':

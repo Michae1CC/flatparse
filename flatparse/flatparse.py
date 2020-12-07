@@ -9,7 +9,7 @@ from flatparse.sequencing import FlatFileCreator
 
 """
 Example usage:
-    python -m flatparse.flatparse --locus_prefix SYMB1 --dname teamcx --gff_path D:\2020_SS\BioInfo\flatparse\test\data\test_data\Breviolum_minutum_short_v2.gff --output_path D:\2020_SS\BioInfo\flatparse\test\data\tmp\test_flat.txt
+    python -m flatparse.flatparse --locus_prefix="SYMB1" --dname="teamcx" --gff_path="D:\2020_SS\BioInfo\flatparse\test\data\test_data\Breviolum_minutum_short_v2.gff" --anno_path="D:\2020_SS\BioInfo\flatparse\test\data\test_data\Bminutum_top_uniprot_hits_v2.tsv" --output_path="D:\2020_SS\BioInfo\flatparse\test\data\tmp\test_flat.txt"
 """
 
 
@@ -18,6 +18,8 @@ def run_ffc(args):
     main_ffc = FlatFileCreator(
         args.locus_prefix, args.dname, args.gff_path, args.anno_path, output_path=args.output_path)
     main_ffc.create_flatfile()
+
+    return
 
 
 def main():
