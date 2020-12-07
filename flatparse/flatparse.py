@@ -9,14 +9,15 @@ from flatparse.sequencing import FlatFileCreator
 
 """
 Example usage:
-    python -m flatparse.flatparse --locus_prefix="SYMB1" --dname="teamcx" --gff_path="D:\2020_SS\BioInfo\flatparse\test\data\test_data\Breviolum_minutum_short_v2.gff" --anno_path="D:\2020_SS\BioInfo\flatparse\test\data\test_data\Bminutum_top_uniprot_hits_v2.tsv" --output_path="D:\2020_SS\BioInfo\flatparse\test\data\tmp\test_flat.txt"
+    python -m flatparse.flatparse --locus_prefix="SYMB1" --dname="teamcx" --gff_path="D:\2020_SS\BioInfo\flatparse\test\data\test_data\Breviolum_minutum_short_v2.gff" --anno_path="D:\2020_SS\BioInfo\flatparse\test\data\test_data\Bminutum_top_uniprot_hits_v2.tsv" --output_path="D:\2020_SS\BioInfo\flatparse\test\data\tmp\test_flat.txt" --anno_delim=\t
 """
 
 
 def run_ffc(args):
 
     main_ffc = FlatFileCreator(
-        args.locus_prefix, args.dname, args.gff_path, args.anno_path, output_path=args.output_path)
+        args.locus_prefix, args.dname, args.gff_path, args.anno_path,
+        output_path=args.output_path, anno_delim=args.anno_delim)
     main_ffc.create_flatfile()
 
     return
@@ -39,6 +40,9 @@ def main():
     parser.add_argument('--output_path', type=str, required=False, default=None,
                         help='A file path to output the contents of the flatfile. '
                         'Default output file is stdout.')
+    parser.add_argument('--anno_delim', type=str,
+                        required=False, default='\t',
+                        help='A delimiter value for the annotation file.')
 
     args = parser.parse_args()
     run_ffc(args)

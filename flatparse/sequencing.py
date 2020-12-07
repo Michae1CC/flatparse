@@ -512,7 +512,7 @@ class Feature:
         """
 
         # Create the feature header
-        feature_header: str = ">Features {feature_name}".format(
+        feature_header: str = ">Feature {feature_name}".format(
             feature_name=self.__feature_name)
 
         # Make a list of components that will eventually
@@ -621,14 +621,14 @@ class FlatFileCreator:
 
         _, df_cols = anno_df.shape
 
-        if df_cols != 1:
+        if df_cols != 0:
             return anno_df
 
         # If we only have one column then the delimiter we are using probably is
         # not correct. We should have at least two columns.
 
-        warning_message = 'Only one column detected in annotation dataframe'
-        'with --delimiter=={0!r}. Expected at least two columns. Switching to python engine parser.'
+        warning_message = 'Could not separate annotation dataframe' + \
+            'with --delimiter={0!r}. Switching to python engine parser.'
         warning_message = warning_message.format(self.__anno_delim)
 
         warnings.warn(warning_message, RuntimeWarning)
