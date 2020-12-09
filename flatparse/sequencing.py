@@ -3,6 +3,7 @@
 __author__ = 'Michael Ciccotosto-Camp'
 __version__ = ''
 
+import re
 import abc
 import warnings
 import pandas as pd
@@ -39,7 +40,7 @@ class ProteinInformation:
 
         self.__kwargs = kwargs
 
-        self.__product: str = kwargs["product"]
+        # self.__product: str = kwargs["product"]
         self.__dname: str = kwargs["dname"]
         self.__gene_locus: str = kwargs["gene_locus"]
         self.__sequence_prefix: str = kwargs["sequence_prefix"]
@@ -52,7 +53,7 @@ class ProteinInformation:
         """
 
         # Check to check that all the essential information is not None
-        essential_info = [self.__product, self.__dname,
+        essential_info = [self.__dname,
                           self.__gene_locus, self.__sequence_prefix]
 
         if any(essential == None for essential in essential_info):
@@ -60,16 +61,44 @@ class ProteinInformation:
 
         compilation_list = []
 
-        product_str = "product {product}".format(product=self.__product)
-        compilation_list.append(product_str)
+        # Try adding the gene name
+        gene_name = self.__kwargs.get("gene_name")
 
-        protein_id_str = "protein_id gnl|{dname}|{gene_locus}".format(
+        if gene_name is not None:
+            gene_name_str = "gene\t{gene_name}".format(gene_name=gene_name)
+            compilation_list.append(gene_name_str)
+
+        # Try adding the gene synonym
+        gene_synonym = self.__kwargs.get("gene_synonym")
+
+        if gene_synonym is not None:
+            gene_synonym_str = "gene_synonym\t{gene_synonym}".format(
+                gene_synonym=gene_synonym)
+            compilation_list.append(gene_synonym_str)
+
+        # Try adding the gene synonym
+        function = self.__kwargs.get("function")
+
+        if function is not None:
+            function_str = "note\t{function}".format(function=function)
+            compilation_list.append(function_str)
+
+        # Try adding the EC number
+        EC_number = self.__kwargs.get("EC_number")
+
+        if EC_number is not None:
+            EC_number_str = "EC_number\t{EC_number}".format(
+                EC_number=EC_number)
+            compilation_list.append(EC_number_str)
+
+        protein_id_str = "protein_id\tgnl|{dname}|{gene_locus}".format(
             dname=self.__dname,
             gene_locus=self.__gene_locus
         )
+
         compilation_list.append(protein_id_str)
 
-        transcript_id_str = "transcript_id gnl|{dname}|{sequence_prefix}.{gene_locus}".format(
+        transcript_id_str = "transcript_id\tgnl|{dname}|{sequence_prefix}.{gene_locus}".format(
             dname=self.__dname,
             sequence_prefix=self.__sequence_prefix,
             gene_locus=self.__gene_locus
@@ -77,11 +106,16 @@ class ProteinInformation:
 
         compilation_list.append(transcript_id_str)
 
-        # Try and get the external reference
-        db_xref_str = self.get_external_reference()
+        # Try adding the accession
+        db_xref_str = self.__kwargs.get("accession")
 
         if db_xref_str is not None:
             compilation_list.append(db_xref_str)
+
+        protein_id_str = "protein_id\tgnl|{dname}|{gene_locus}".format(
+            dname=self.__dname,
+            gene_locus=self.__gene_locus
+        )
 
         return '\n'.join(compilation_list)
 
@@ -126,6 +160,16 @@ class ProteinInformation:
         if accession is not None:
             self.process_accession(accession)
 
+        function = self.extract_value(
+            anno_row, "function", add_to_dict=False)
+
+        if function is not None:
+            self.process_function(function)
+
+        self.extract_value(anno_row, "EC_number", add_to_dict=True)
+
+        return
+
     def extract_value(self, anno_row, value, add_to_dict=False) -> str:
         """
         Extracts a certain value from a certain row of the annotation file.
@@ -151,7 +195,7 @@ class ProteinInformation:
             return None
 
         # Don't add the gene name if it has na
-        if extracted_value.lower() == 'na':
+        if extracted_value.lower() in ['na', 'nan']:
             return None
 
         if add_to_dict:
@@ -167,57 +211,41 @@ class ProteinInformation:
 
         db_xref_prefix, db_xref_id, *_ = accession.split(sep='|')
 
+        db_xref_prefix, db_xref_id = db_xref_prefix.strip(), db_xref_id.strip()
+
         if db_xref_prefix == "sp":
             self.__kwargs["accession"] = 'db_xref="UniProtKB/Swiss-Prot:{0}"'.format(
                 db_xref_id)
         elif db_xref_prefix == "tr":
             self.__kwargs["accession"] = 'db_xref="UniProtKB/TrEMBL:{0}"'.format(
                 db_xref_id)
+        else:
+            raise NotImplementedError(
+                "Not equipped to handle db xref (" + db_xref_id + ") with prefix: " + repr(db_xref_prefix))
 
-        raise NotImplementedError(
-            "Not equipped to handle db xref prefix: " + db_xref_prefix)
+        return
 
-    def get_external_reference(self) -> str:
+    def process_function(self, function: str):
         """
-        Attempts to find an external database reference from the annotations 
-        file.
+        Processes the function string, extracting the EC value if needed.
 
-        Return:
-            The appropriately formatted reference string IF a reference is 
-            found, None otherwise.
-
-        Example:
-            db_xref="UniProtKB/Swiss-Prot:P12345"
+        Parameters:
+            function:
+                The raw function string.
         """
 
-        # Create a quick reference to the annotations dataframe
-        anno_df = self.__kwargs["annotation_df"]
+        EC_pattern = r'\(EC (?P<ID>[0-9_.-]+)\)'
 
-        # Retrieve the gene id
-        gene_id = self.__kwargs["gene_id"]
+        result = re.search(EC_pattern, function)
 
-        anno_db_xref = None
+        if result is not None:
 
-        try:
-            # Try to retrieve the corresponding external reference from the
-            # annotation file by indexing the dataframe created using the
-            # annotations file
-            anno_db_xref = anno_df.loc[gene_id][1]
+            EC_number = result.group("ID")
+            function = re.sub(EC_pattern, '', function)
 
-        except KeyError:
-            # If no external reference exists a key error will be thrown. Just
-            # return None if this is the case
-            return None
+            self.__kwargs["EC_number"] = EC_number
 
-        db_xref_prefix, db_xref_id, *_ = anno_db_xref.split(sep='|')
-
-        if db_xref_prefix == "sp":
-            return 'db_xref="UniProtKB/Swiss-Prot:{0}"'.format(db_xref_id)
-        elif db_xref_prefix == "tr":
-            return 'db_xref="UniProtKB/TrEMBL:{0}"'.format(db_xref_id)
-
-        raise NotImplementedError(
-            "Not equipped to handle db xref prefix: " + db_xref_prefix)
+        self.__kwargs["function"] = function
 
 
 class AbstractGene(abc.ABC):
@@ -430,7 +458,7 @@ class GeneSequence:
         next_type = None
 
         # Start decomposing the sequence
-        for next_line_num in range(current_line_num + 1, self.__line_end):
+        for next_line_num in range(current_line_num, self.__line_end):
 
             # Ignore lines with type exons
             if self.__gff.lines[next_line_num]["type"] == "exon":
@@ -448,6 +476,12 @@ class GeneSequence:
 
         # Don't forget to save the last segment!
         segment_dict[(current_line_num, self.__line_end)] = next_type
+
+        # Check if the last line creates a new gene
+        if self.__gff.lines[self.__line_end]["type"] != self.__gff.lines[current_line_num]["type"] \
+                and self.__gff.lines[self.__line_end]["type"] != 'exon':
+            segment_dict[(self.__line_end, self.__line_end)
+                         ] = self.__gff.lines[self.__line_end]["type"]
 
         return segment_dict
 
@@ -697,15 +731,15 @@ class FlatFileCreator:
 
         if self.__anno_delim is None:
             return pd.read_csv(
-                self.__annotation_path, engine='python', sep=None, header=None, index_col=0)
+                self.__annotation_path, engine='python', sep=None,  index_col='sequence').astype(str)
 
         anno_df = pd.read_csv(
-            self.__annotation_path, engine='c', sep=self.__anno_delim, header=None, index_col=0)
+            self.__annotation_path, engine='c', sep=self.__anno_delim,  index_col='sequence')
 
         _, df_cols = anno_df.shape
 
         if df_cols != 0:
-            return anno_df
+            return anno_df.astype(str)
 
         # If we only have one column then the delimiter we are using probably is
         # not correct. We should have at least two columns.
@@ -717,7 +751,7 @@ class FlatFileCreator:
         warnings.warn(warning_message, RuntimeWarning)
 
         return pd.read_csv(
-            self.__annotation_path, engine='python', sep=None, header=None, index_col=0)
+            self.__annotation_path, engine='python', sep=None,  index_col='sequence').astype(str)
 
     def segment_condition_met(self, current_line_num, next_line_num):
 

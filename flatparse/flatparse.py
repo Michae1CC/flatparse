@@ -9,7 +9,7 @@ from flatparse.sequencing import FlatFileCreator
 
 """
 Example usage:
-    python -m flatparse.flatparse --locus_prefix="SYMB1" --dname="teamcx" --gff_path="D:\2020_SS\BioInfo\flatparse\test\data\test_data\Breviolum_minutum_short_v2.gff" --anno_path="D:\2020_SS\BioInfo\flatparse\test\data\test_data\Bminutum_top_uniprot_hits_v2.tsv" --output_path="D:\2020_SS\BioInfo\flatparse\test\data\tmp\test_flat.txt" --anno_delim=\t
+    python -m flatparse.flatparse --locus_prefix="SYMB1" --dname="teamcx" --gff_path="D:\2020_SS\BioInfo\flatparse\test\data\Slin_CCMP2456\S.linucheae_CCMP2456_eg1.gff" --anno_path="D:\2020_SS\BioInfo\flatparse\test\data\Slin_CCMP2456\S.linucheae_CCMP2456_uniprot_annotated.tsv" --output_path="D:\2020_SS\BioInfo\flatparse\test\data\Slin_CCMP2456\test_flat.txt" --anno_delim=\t
 """
 
 
