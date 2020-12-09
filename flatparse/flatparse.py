@@ -35,7 +35,12 @@ def main():
     parser.add_argument('--gff_path', type=str, required=True,
                         help='A file path to the gff file.')
     parser.add_argument('--anno_path', type=str, required=True,
-                        help='A file path to the annotation file.')
+                        help="A file path to the annotation file. "
+                        "Every annotation MUST have a column named 'sequence' "
+                        "which is a unique identifier. Other optional columns "
+                        "to include are: 'accession' 'function' 'gene_name' "
+                        "'gene_synonym' and 'EC_number'. NOTE: these column "
+                        "names are case sensitive.")
 
     parser.add_argument('--output_path', type=str, required=False, default=None,
                         help='A file path to output the contents of the flatfile. '

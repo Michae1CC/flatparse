@@ -44,6 +44,8 @@ class ProteinInformation:
         self.__gene_locus: str = kwargs["gene_locus"]
         self.__sequence_prefix: str = kwargs["sequence_prefix"]
 
+        self.get_anno_info()
+
     def __str__(self):
         """
         Returns the string representation for the protein information.
@@ -93,6 +95,87 @@ class ProteinInformation:
         )
 
         return repr_
+
+    def get_anno_info(self):
+        """
+        Extracts optional information from the annotation file.
+        """
+
+        # Create a quick reference to the annotations dataframe
+        anno_df = self.__kwargs["annotation_df"]
+
+        # Retrieve the gene id
+        gene_id = self.__kwargs["gene_id"]
+
+        try:
+            # Try to retrieve the optional information corresponding to this
+            # protein
+            anno_row = anno_df.loc[gene_id]
+
+        except KeyError:
+            # If no external reference exists a key error will be thrown. Just
+            # return None if this is the case
+            return
+
+        self.extract_value(anno_row, "gene_name", add_to_dict=True)
+        self.extract_value(anno_row, "gene_synonym", add_to_dict=True)
+
+        accession = self.extract_value(
+            anno_row, "accession", add_to_dict=False)
+
+        if accession is not None:
+            self.process_accession(accession)
+
+    def extract_value(self, anno_row, value, add_to_dict=False) -> str:
+        """
+        Extracts a certain value from a certain row of the annotation file.
+
+        Parameters:
+            anno_row
+                The row of the annotation file to extract the value.
+
+            value:
+                The value to be extracted from the row.
+
+            add_to_dict:
+                If True, the extracted value is added to self.__kwargs without
+                any further processing.
+
+        Returns:
+            Returns the extracted value as a string. None otherwise.
+        """
+
+        try:
+            extracted_value = anno_row[value]
+        except KeyError:
+            return None
+
+        # Don't add the gene name if it has na
+        if extracted_value.lower() == 'na':
+            return None
+
+        if add_to_dict:
+            self.__kwargs[value] = extracted_value
+
+        return extracted_value
+
+    def process_accession(self, accession):
+        """
+        Processes the accession value from the annotation file and adds it to
+        self.__kwargs.
+        """
+
+        db_xref_prefix, db_xref_id, *_ = accession.split(sep='|')
+
+        if db_xref_prefix == "sp":
+            self.__kwargs["accession"] = 'db_xref="UniProtKB/Swiss-Prot:{0}"'.format(
+                db_xref_id)
+        elif db_xref_prefix == "tr":
+            self.__kwargs["accession"] = 'db_xref="UniProtKB/TrEMBL:{0}"'.format(
+                db_xref_id)
+
+        raise NotImplementedError(
+            "Not equipped to handle db xref prefix: " + db_xref_prefix)
 
     def get_external_reference(self) -> str:
         """
