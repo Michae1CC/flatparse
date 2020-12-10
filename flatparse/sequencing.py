@@ -329,7 +329,9 @@ class AbstractGene(abc.ABC):
             gene_num=self.__gene_num
         )
         protein_info_dict["parent"] = self._gff.lines[self.__line_start]
-        protein_info_dict["gene_id"] = self.gene_id
+
+        if protein_info_dict.get("gene_id") is None:
+            protein_info_dict["gene_id"] = self.gene_id
 
         simple_protein_info = ProteinInformation(
             **protein_info_dict,
@@ -436,6 +438,70 @@ class GeneSequence:
         self.__line_start: int = line_start
         self.__line_end: int = line_end
         self.__kwargs = kwargs
+        self.__kwargs["gene_id"] = self.gene_id
+
+        self.get_anno_info()
+
+    @property
+    def gene_id(self):
+        return self.__gff.lines[self.__line_start]["attributes"]["Name"] + ".mRNA1"
+
+    def get_anno_info(self):
+        """
+        Extracts optional information from the annotation file.
+        """
+
+        # Create a quick reference to the annotations dataframe
+        anno_df = self.__kwargs["annotation_df"]
+
+        # Retrieve the gene id
+        gene_id = self.__kwargs["gene_id"]
+
+        try:
+            # Try to retrieve the optional information corresponding to this
+            # protein
+            anno_row = anno_df.loc[gene_id]
+
+        except KeyError:
+            # If no external reference exists a key error will be thrown. Just
+            # return None if this is the case
+            return
+
+        self.extract_value(anno_row, "gene_name", add_to_dict=True)
+        self.extract_value(anno_row, "gene_synonym", add_to_dict=True)
+
+    def extract_value(self, anno_row, value, add_to_dict=False) -> str:
+        """
+        Extracts a certain value from a certain row of the annotation file.
+
+        Parameters:
+            anno_row
+                The row of the annotation file to extract the value.
+
+            value:
+                The value to be extracted from the row.
+
+            add_to_dict:
+                If True, the extracted value is added to self.__kwargs without
+                any further processing.
+
+        Returns:
+            Returns the extracted value as a string. None otherwise.
+        """
+
+        try:
+            extracted_value = anno_row[value]
+        except KeyError:
+            return None
+
+        # Don't add the gene name if it has na
+        if extracted_value.lower() in ['na', 'nan']:
+            return None
+
+        if add_to_dict:
+            self.__kwargs[value] = extracted_value
+
+        return extracted_value
 
     def analyse_sequence(self) -> Dict[Tuple[int, int], str]:
         """
@@ -528,10 +594,10 @@ class GeneSequence:
 
             if type_ == "CDS":
                 gene_container = CDSGene(self.__gff, self.__gene_num,
-                                         gene_con_start, gene_con_end, **self.__kwargs)
+                                         gene_con_start, gene_con_end, **{**self.__kwargs})
             elif type_ == "mRNA":
                 gene_container = mRNAGene(self.__gff, self.__gene_num,
-                                          gene_con_start, gene_con_end, **self.__kwargs)
+                                          gene_con_start, gene_con_end, **{**self.__kwargs})
 
             if gene_container is not None:
                 segment_str_list.append(str(gene_container))
@@ -545,6 +611,21 @@ class GeneSequence:
             locus_prefix=self.__kwargs["locus_prefix"],
             gene_num=self.__gene_num
         )
+
+        # Try adding the gene name
+        gene_name = self.__kwargs.get("gene_name")
+
+        if gene_name is not None:
+            gene_name_str = "\t\t\tgene\t{gene_name}".format(gene_name=gene_name)
+            segment_str_list.insert(0, gene_name_str)
+
+        # Try adding the gene synonym
+        gene_synonym = self.__kwargs.get("gene_synonym")
+
+        if gene_synonym is not None:
+            gene_synonym_str = "\t\t\tgene_synonym\t{gene_synonym}".format(
+                gene_synonym=gene_synonym)
+            segment_str_list.insert(0, gene_synonym_str)
 
         segment_str_list.insert(0, locus_line)
         segment_str_list.insert(0, start_end_line)
